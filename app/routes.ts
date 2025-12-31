@@ -42,6 +42,9 @@ export default [
     ]),
     ...prefix("/products", [
       route("/create", "features/products/api/create.tsx"),
+      route("/update", "features/products/api/update.tsx"),
+      route("/delete", "features/products/api/delete.tsx"),
+      route("/toggle-sold-out", "features/products/api/toggle-sold-out.tsx"),
     ]),
     ...prefix("/cron", [route("/mailer", "features/cron/api/mailer.tsx")]),
   ]),
@@ -90,6 +93,8 @@ export default [
   layout("core/layouts/private.layout.tsx", { id: "private-products" }, [
     ...prefix("/products", [
       route("/create", "features/products/screens/create.tsx"),
+      route("/manage", "features/products/screens/manage.tsx"),
+      route("/edit/:id", "features/products/screens/edit.tsx"),
     ]),
   ]),
 

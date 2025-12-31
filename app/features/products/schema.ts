@@ -7,6 +7,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
   doublePrecision,
   integer,
   pgPolicy,
@@ -48,6 +49,8 @@ export const products = pgTable(
     depth: doublePrecision(),
     // URL-friendly slug (unique)
     slug: text().notNull().unique(),
+    // Sold out status
+    sold_out: boolean().notNull().default(false),
     // Foreign key to the user who created the product
     // Using CASCADE ensures product is deleted when user is deleted
     created_by: uuid().references(() => authUsers.id, {

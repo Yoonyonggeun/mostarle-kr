@@ -1,4 +1,4 @@
-import { type Route } from "@rr/app/features/products/api/+types/create";
+import type { Route } from "@rr/app/features/products/api/+types/create";
 import {
   GripVertical,
   ImageIcon,
@@ -51,9 +51,52 @@ interface ImageItem {
   id: string;
   file: File;
   preview: string;
+  existingId?: number; // For existing images from database
+  existingUrl?: string; // For existing images from database
 }
 
-export default function CreateProductForm() {
+interface ExistingImage {
+  image_id: number;
+  image_url: string;
+  image_order: number;
+}
+
+interface ExistingDetail {
+  detail_id: number;
+  detail_title: string;
+  detail_description: string;
+  detail_image_url: string | null;
+  detail_order: number;
+}
+
+interface InitialData {
+  product: {
+    product_id: number;
+    title: string;
+    price: number;
+    difficulty: number | null;
+    working_time: number;
+    width: number | null;
+    height: number | null;
+    depth: number | null;
+    slug: string;
+    sold_out: boolean;
+  };
+  images: ExistingImage[];
+  details: ExistingDetail[];
+}
+
+interface CreateProductFormProps {
+  initialData?: InitialData;
+  actionUrl?: string;
+  mode?: "create" | "edit";
+}
+
+export default function CreateProductForm({
+  initialData,
+  actionUrl = "/api/products/create",
+  mode = "create",
+}: CreateProductFormProps = {}) {
   const fetcher = useFetcher<Route.ComponentProps["actionData"]>();
   const formRef = useRef<HTMLFormElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -73,17 +116,62 @@ export default function CreateProductForm() {
   // Dynamic fields
   const [details, setDetails] = useState<DetailItem[]>([]);
   const [images, setImages] = useState<ImageItem[]>([]);
+  const [existingImageIds, setExistingImageIds] = useState<number[]>([]);
+  const [existingDetailIds, setExistingDetailIds] = useState<number[]>([]);
 
   // Drag and drop state
   const [draggedImageId, setDraggedImageId] = useState<string | null>(null);
   const [draggedDetailId, setDraggedDetailId] = useState<string | null>(null);
 
-  // Auto-generate slug when title changes
+  // Initialize form with initial data
   useEffect(() => {
-    if (autoGenerateSlug && title) {
+    if (initialData) {
+      setTitle(initialData.product.title);
+      setPrice(initialData.product.price.toString());
+      setDifficulty(
+        initialData.product.difficulty?.toString() || "",
+      );
+      setWorkingTime(initialData.product.working_time.toString());
+      setWidth(initialData.product.width?.toString() || "");
+      setHeight(initialData.product.height?.toString() || "");
+      setDepth(initialData.product.depth?.toString() || "");
+      setSlug(initialData.product.slug);
+      setAutoGenerateSlug(false);
+
+      // Set existing images
+      const existingImages: ImageItem[] = initialData.images
+        .sort((a, b) => a.image_order - b.image_order)
+        .map((img) => ({
+          id: `existing-${img.image_id}`,
+          file: new File([], ""), // Dummy file for existing images
+          preview: img.image_url,
+          existingId: img.image_id,
+          existingUrl: img.image_url,
+        }));
+      setImages(existingImages);
+      setExistingImageIds(initialData.images.map((img) => img.image_id));
+
+      // Set existing details
+      const existingDetails: DetailItem[] = initialData.details
+        .sort((a, b) => a.detail_order - b.detail_order)
+        .map((detail) => ({
+          id: `existing-${detail.detail_id}`,
+          title: detail.detail_title,
+          description: detail.detail_description,
+          image: null,
+          imagePreview: detail.detail_image_url || null,
+        }));
+      setDetails(existingDetails);
+      setExistingDetailIds(initialData.details.map((detail) => detail.detail_id));
+    }
+  }, [initialData]);
+
+  // Auto-generate slug when title changes (only in create mode)
+  useEffect(() => {
+    if (mode === "create" && autoGenerateSlug && title) {
       setSlug(generateSlug(title));
     }
-  }, [title, autoGenerateSlug]);
+  }, [title, autoGenerateSlug, mode]);
 
   // Clean up object URLs on unmount
   useEffect(() => {
@@ -155,8 +243,22 @@ export default function CreateProductForm() {
 
   const handleRemoveDetail = (id: string) => {
     const detail = details.find((d) => d.id === id);
-    if (detail?.imagePreview) {
-      URL.revokeObjectURL(detail.imagePreview);
+    if (detail?.imagePreview && detail.id.startsWith("existing-")) {
+      // Only revoke if it's a new preview, not an existing URL
+      try {
+        URL.revokeObjectURL(detail.imagePreview);
+      } catch {
+        // Ignore errors for existing URLs
+      }
+    }
+    // Remove from existing IDs if it was an existing detail
+    if (detail?.id.startsWith("existing-")) {
+      const detailId = parseInt(detail.id.replace("existing-", ""), 10);
+      if (!isNaN(detailId)) {
+        setExistingDetailIds(
+          existingDetailIds.filter((dId) => dId !== detailId),
+        );
+      }
     }
     setDetails(details.filter((d) => d.id !== id));
   };
@@ -204,8 +306,15 @@ export default function CreateProductForm() {
 
   const handleRemoveImage = (id: string) => {
     const image = images.find((img) => img.id === id);
-    if (image?.preview) {
+    if (image?.preview && !image.existingUrl) {
+      // Only revoke if it's not an existing image URL
       URL.revokeObjectURL(image.preview);
+    }
+    // Remove from existing IDs if it was an existing image
+    if (image?.existingId) {
+      setExistingImageIds(
+        existingImageIds.filter((imgId) => imgId !== image.existingId),
+      );
     }
     setImages(images.filter((img) => img.id !== id));
   };
@@ -261,11 +370,22 @@ export default function CreateProductForm() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (images.length === 0) {
+    // In edit mode, allow submission if there are existing images or new images
+    // In create mode, require at least one image
+    if (mode === "create" && images.length === 0) {
+      return;
+    }
+    if (mode === "edit" && images.length === 0 && existingImageIds.length === 0) {
       return;
     }
 
     const formData = new FormData();
+
+    // Add product_id in edit mode
+    if (mode === "edit" && initialData) {
+      formData.append("product_id", initialData.product.product_id.toString());
+    }
+
     formData.append("title", title);
     formData.append("price", price);
     if (difficulty) {
@@ -285,16 +405,33 @@ export default function CreateProductForm() {
       formData.append("slug", slug);
     }
 
-    // Add images
+    // Add existing image IDs (for edit mode)
+    if (mode === "edit") {
+      existingImageIds.forEach((id) => {
+        formData.append("existing_image_ids", id.toString());
+      });
+    }
+
+    // Add new images (only files, not existing ones)
     images.forEach((img) => {
-      formData.append("images", img.file);
+      if (img.file && img.file.size > 0 && !img.existingId) {
+        formData.append("images", img.file);
+      }
     });
+
+    // Add existing detail IDs (for edit mode)
+    if (mode === "edit") {
+      existingDetailIds.forEach((id) => {
+        formData.append("existing_detail_ids", id.toString());
+      });
+    }
 
     // Add details
     details.forEach((detail, index) => {
       formData.append(`details[${index}].title`, detail.title);
       formData.append(`details[${index}].description`, detail.description);
-      if (detail.image) {
+      // Only add image if it's a new file
+      if (detail.image && !detail.id.startsWith("existing-")) {
         formData.append(`details[${index}].image`, detail.image);
       }
     });
@@ -302,7 +439,7 @@ export default function CreateProductForm() {
     fetcher.submit(formData, {
       method: "POST",
       encType: "multipart/form-data",
-      action: "/api/products/create",
+      action: actionUrl,
     });
   };
 
@@ -515,6 +652,7 @@ export default function CreateProductForm() {
                     className={cn(
                       "group relative cursor-move rounded-lg border-2 border-dashed p-2 transition-colors",
                       draggedImageId === img.id && "border-primary opacity-50",
+                      img.existingId && "border-blue-300",
                     )}
                   >
                     <div className="relative aspect-square w-full overflow-hidden rounded-md">
@@ -526,6 +664,11 @@ export default function CreateProductForm() {
                       <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
                         <GripVertical className="text-white size-8" />
                       </div>
+                      {img.existingId && (
+                        <div className="absolute left-2 top-2 rounded bg-blue-500 px-2 py-1 text-xs text-white">
+                          기존
+                        </div>
+                      )}
                     </div>
                     <Button
                       type="button"
@@ -639,6 +782,11 @@ export default function CreateProductForm() {
                           alt="Detail preview"
                           className="h-full w-full object-cover"
                         />
+                        {detail.id.startsWith("existing-") && (
+                          <div className="absolute left-2 top-2 rounded bg-blue-500 px-2 py-1 text-xs text-white">
+                            기존 이미지
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -663,14 +811,24 @@ export default function CreateProductForm() {
           <CardFooter className="flex flex-col gap-4">
             <FetcherFormButton
               submitting={fetcher.state === "submitting"}
-              label="상품 생성"
+              label={mode === "edit" ? "상품 수정" : "상품 생성"}
               className="w-full"
-              disabled={images.length === 0}
+              disabled={
+                mode === "create"
+                  ? images.length === 0
+                  : images.length === 0 && existingImageIds.length === 0
+              }
             />
             {fetcher.data &&
             "success" in fetcher.data &&
             fetcher.data.success ? (
-              <FormSuccess message="상품이 성공적으로 생성되었습니다" />
+              <FormSuccess
+                message={
+                  mode === "edit"
+                    ? "상품이 성공적으로 수정되었습니다"
+                    : "상품이 성공적으로 생성되었습니다"
+                }
+              />
             ) : null}
             {fetcher.data && "error" in fetcher.data && fetcher.data.error ? (
               <FormErrors errors={[fetcher.data.error]} />

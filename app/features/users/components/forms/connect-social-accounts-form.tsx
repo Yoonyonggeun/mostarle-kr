@@ -1,4 +1,3 @@
-import { Button } from "~/core/components/ui/button";
 import {
   Card,
   CardContent,
@@ -6,7 +5,6 @@ import {
   CardHeader,
   CardTitle,
 } from "~/core/components/ui/card";
-import { GithubLogo } from "~/features/auth/components/logos/github";
 import { KakaoLogo } from "~/features/auth/components/logos/kakao";
 
 import {
@@ -15,11 +13,6 @@ import {
 } from "../connect-provider-buttons";
 
 const enabledProviders = [
-  {
-    name: "Github",
-    key: "github",
-    logo: <GithubLogo />,
-  },
   {
     name: "Kakao",
     key: "kakao",

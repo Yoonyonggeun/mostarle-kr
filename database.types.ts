@@ -151,6 +151,7 @@ export type Database = {
           price: number
           product_id: number
           slug: string
+          sold_out: boolean
           title: string
           updated_at: string
           width: number | null
@@ -165,6 +166,7 @@ export type Database = {
           price: number
           product_id?: never
           slug: string
+          sold_out?: boolean
           title: string
           updated_at?: string
           width?: number | null
@@ -179,6 +181,7 @@ export type Database = {
           price?: number
           product_id?: never
           slug?: string
+          sold_out?: boolean
           title?: string
           updated_at?: string
           width?: number | null

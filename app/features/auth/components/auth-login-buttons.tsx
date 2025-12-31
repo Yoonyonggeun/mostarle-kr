@@ -20,12 +20,12 @@ import { KakaoLogo } from "./logos/kakao";
 
 /**
  * Generic authentication button component
- * 
+ *
  * This component renders a consistent button for any authentication provider.
  * It includes the provider's logo and a standardized "Continue with [Provider]" text.
  * The button uses the outline variant for a clean look and links to the appropriate
  * authentication flow.
- * 
+ *
  * @param logo - React node representing the provider's logo
  * @param label - Provider name (e.g., "Google", "Apple")
  * @param href - URL path to the authentication flow for this provider
@@ -55,7 +55,7 @@ function AuthLoginButton({
 
 /**
  * Social login authentication options
- * 
+ *
  * This component renders a button for Kakao authentication provider.
  * The button uses the provider's official logo and links to the appropriate
  * OAuth flow. The styling is consistent while respecting the provider's
@@ -73,9 +73,9 @@ function SocialLoginButtons() {
 
 /**
  * Complete set of sign-in authentication options
- * 
+ *
  * This exported component provides Kakao authentication option for the sign-in flow.
- * 
+ *
  * Usage:
  * ```tsx
  * <SignInButtons />
@@ -87,9 +87,9 @@ export function SignInButtons() {
 
 /**
  * Authentication options for the sign-up flow
- * 
+ *
  * This exported component provides Kakao authentication option specifically for the sign-up flow.
- * 
+ *
  * Usage:
  * ```tsx
  * <SignUpButtons />

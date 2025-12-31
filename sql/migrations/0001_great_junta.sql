@@ -38,17 +38,20 @@ BEGIN
             -- If user provided a name during registration, use it
             IF new.raw_user_meta_data ? 'name' THEN
                 INSERT INTO public.profiles (profile_id, name, marketing_consent)
-                VALUES (new.id, new.raw_user_meta_data ->> 'name', (new.raw_user_meta_data ->> 'marketing_consent')::boolean);
+                VALUES (new.id, new.raw_user_meta_data ->> 'name', (new.raw_user_meta_data ->> 'marketing_consent')::boolean)
+                ON CONFLICT (profile_id) DO NOTHING;
             ELSE
                 -- Otherwise, set a default name and opt-in to marketing
                 INSERT INTO public.profiles (profile_id, name, marketing_consent)
-                VALUES (new.id, 'Anonymous', TRUE);
+                VALUES (new.id, 'Anonymous', TRUE)
+                ON CONFLICT (profile_id) DO NOTHING;
             END IF;
         ELSE
             -- Handle OAuth providers (Google, GitHub, etc.)
             -- Use the profile data provided by the OAuth provider
             INSERT INTO public.profiles (profile_id, name, avatar_url, marketing_consent)
-            VALUES (new.id, new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'avatar_url', TRUE);
+            VALUES (new.id, new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'avatar_url', TRUE)
+            ON CONFLICT (profile_id) DO NOTHING;
         END IF;
     END IF;
     RETURN NEW; -- Return the user record that triggered this function
@@ -64,10 +67,14 @@ $$;
  * The trigger runs once for each row inserted (FOR EACH ROW)
  * and only activates on INSERT operations, not on UPDATE or DELETE.
  */
-CREATE TRIGGER handle_sign_up
-AFTER INSERT ON auth.users
-FOR EACH ROW
-EXECUTE FUNCTION handle_sign_up();
+DO $$ BEGIN
+  CREATE TRIGGER handle_sign_up
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION handle_sign_up();
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 /**
@@ -109,10 +116,14 @@ $$;
  * It runs BEFORE UPDATE to modify the record before it's saved,
  * ensuring that every update operation includes the current timestamp.
  */
-CREATE TRIGGER set_profiles_updated_at
-BEFORE UPDATE ON public.profiles
-FOR EACH ROW
-EXECUTE FUNCTION public.set_updated_at();
+DO $$ BEGIN
+  CREATE TRIGGER set_profiles_updated_at
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 /**
@@ -127,9 +138,13 @@ EXECUTE FUNCTION public.set_updated_at();
  * This is particularly important for payment records to maintain
  * an accurate audit trail of when payment information was last modified.
  */
-CREATE TRIGGER set_payments_updated_at
-BEFORE UPDATE ON public.payments
-FOR EACH ROW
-EXECUTE FUNCTION public.set_updated_at();
+DO $$ BEGIN
+  CREATE TRIGGER set_payments_updated_at
+  BEFORE UPDATE ON public.payments
+  FOR EACH ROW
+  EXECUTE FUNCTION public.set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 

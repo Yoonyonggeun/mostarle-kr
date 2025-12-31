@@ -29,17 +29,20 @@ BEGIN
             -- If user provided a name during registration, use it
             IF new.raw_user_meta_data ? 'name' THEN
                 INSERT INTO public.profiles (profile_id, name, marketing_consent)
-                VALUES (new.id, new.raw_user_meta_data ->> 'name', (new.raw_user_meta_data ->> 'marketing_consent')::boolean);
+                VALUES (new.id, new.raw_user_meta_data ->> 'name', (new.raw_user_meta_data ->> 'marketing_consent')::boolean)
+                ON CONFLICT (profile_id) DO NOTHING;
             ELSE
                 -- Otherwise, set a default name and opt-in to marketing
                 INSERT INTO public.profiles (profile_id, name, marketing_consent)
-                VALUES (new.id, 'Anonymous', TRUE);
+                VALUES (new.id, 'Anonymous', TRUE)
+                ON CONFLICT (profile_id) DO NOTHING;
             END IF;
         ELSE
             -- Handle OAuth providers (Google, GitHub, etc.)
             -- Use the profile data provided by the OAuth provider
             INSERT INTO public.profiles (profile_id, name, avatar_url, marketing_consent)
-            VALUES (new.id, new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'avatar_url', TRUE);
+            VALUES (new.id, new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'avatar_url', TRUE)
+            ON CONFLICT (profile_id) DO NOTHING;
         END IF;
     END IF;
     RETURN NEW; -- Return the user record that triggered this function

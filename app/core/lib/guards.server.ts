@@ -44,6 +44,48 @@ export async function requireAuthentication(client: SupabaseClient) {
 }
 
 /**
+ * Require admin email for a route or action
+ * 
+ * This function checks if a user is authenticated and has the specified admin email.
+ * If the user is not authenticated or doesn't have the required email, it throws
+ * a 403 Forbidden response.
+ * 
+ * @example
+ * // In a loader or action function
+ * export async function loader({ request }: LoaderArgs) {
+ *   const [client] = makeServerClient(request);
+ *   await requireAdminEmail(client);
+ *   
+ *   // Continue with admin-only logic...
+ *   return json({ ... });
+ * }
+ * 
+ * @param client - The Supabase client instance to use for authentication check
+ * @param allowedEmail - The email address that is allowed to access (default: "yoon5ye@gmail.com")
+ * @returns The authenticated user if authorized
+ * @throws {Response} 401 Unauthorized if no user is authenticated
+ * @throws {Response} 403 Forbidden if user email doesn't match the allowed email
+ */
+export async function requireAdminEmail(
+  client: SupabaseClient,
+  allowedEmail: string = "yoon5ye@gmail.com",
+) {
+  const {
+    data: { user },
+  } = await client.auth.getUser();
+  
+  if (!user) {
+    throw data(null, { status: 401 });
+  }
+  
+  if (user.email !== allowedEmail) {
+    throw data(null, { status: 403 });
+  }
+  
+  return user;
+}
+
+/**
  * Require a specific HTTP method for a route action
  * 
  * This function returns a middleware that checks if the incoming request uses

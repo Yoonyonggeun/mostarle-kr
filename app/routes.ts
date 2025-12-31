@@ -40,6 +40,9 @@ export default [
         "features/users/api/disconnect-provider.tsx",
       ),
     ]),
+    ...prefix("/products", [
+      route("/create", "features/products/api/create.tsx"),
+    ]),
     ...prefix("/cron", [route("/mailer", "features/cron/api/mailer.tsx")]),
   ]),
 
@@ -81,6 +84,12 @@ export default [
         route("/payments", "features/payments/screens/payments.tsx"),
       ]),
       route("/account/edit", "features/users/screens/account.tsx"),
+    ]),
+  ]),
+
+  layout("core/layouts/private.layout.tsx", { id: "private-products" }, [
+    ...prefix("/products", [
+      route("/create", "features/products/screens/create.tsx"),
     ]),
   ]),
 

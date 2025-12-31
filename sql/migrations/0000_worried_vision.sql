@@ -20,8 +20,8 @@
  * - Tracks payment status and timestamps
  * - Links to user accounts via user_id foreign key
  */
-CREATE TABLE "payments" (
-	"payment_id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "payments_payment_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
+CREATE TABLE IF NOT EXISTS "payments" (
+	"payment_id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
 	"payment_key" text NOT NULL,
 	"order_id" text NOT NULL,
 	"order_name" text NOT NULL,
@@ -38,7 +38,11 @@ CREATE TABLE "payments" (
 );
 --> statement-breakpoint
 -- Enable Row Level Security on payments table to restrict access based on user identity
-ALTER TABLE "payments" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+DO $$ BEGIN
+  ALTER TABLE "payments" ENABLE ROW LEVEL SECURITY;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
 /**
  * Profiles Table
  * 
@@ -51,7 +55,7 @@ ALTER TABLE "payments" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
  * - Tracks marketing consent for compliance with privacy regulations
  * - Includes standard audit timestamps (created_at, updated_at)
  */
-CREATE TABLE "profiles" (
+CREATE TABLE IF NOT EXISTS "profiles" (
 	"profile_id" uuid PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"avatar_url" text,
@@ -61,13 +65,25 @@ CREATE TABLE "profiles" (
 );
 --> statement-breakpoint
 -- Enable Row Level Security on profiles table to restrict access based on user identity
-ALTER TABLE "profiles" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+DO $$ BEGIN
+  ALTER TABLE "profiles" ENABLE ROW LEVEL SECURITY;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
 -- Add foreign key constraint to link payments to users
 -- CASCADE deletion ensures no orphaned payment records when a user is deleted
-ALTER TABLE "payments" ADD CONSTRAINT "payments_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+DO $$ BEGIN
+  ALTER TABLE "payments" ADD CONSTRAINT "payments_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
 -- Add foreign key constraint to link profiles to users
 -- CASCADE deletion ensures profile is deleted when the corresponding user is deleted
-ALTER TABLE "profiles" ADD CONSTRAINT "profiles_profile_id_users_id_fk" FOREIGN KEY ("profile_id") REFERENCES "auth"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+DO $$ BEGIN
+  ALTER TABLE "profiles" ADD CONSTRAINT "profiles_profile_id_users_id_fk" FOREIGN KEY ("profile_id") REFERENCES "auth"."users"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
 /**
  * Row Level Security Policies
  * 
@@ -76,11 +92,27 @@ ALTER TABLE "profiles" ADD CONSTRAINT "profiles_profile_id_users_id_fk" FOREIGN 
  */
 
 -- Allow users to view only their own payment records
-CREATE POLICY "select-payment-policy" ON "payments" AS PERMISSIVE FOR SELECT TO "authenticated" USING ((select auth.uid()) = "payments"."user_id");--> statement-breakpoint
+DO $$ BEGIN
+  CREATE POLICY "select-payment-policy" ON "payments" AS PERMISSIVE FOR SELECT TO "authenticated" USING ((select auth.uid()) = "payments"."user_id");
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
 -- Allow users to update only their own profile
 -- Both USING and WITH CHECK clauses ensure the user can only modify their own profile
-CREATE POLICY "edit-profile-policy" ON "profiles" AS PERMISSIVE FOR UPDATE TO "authenticated" USING ((select auth.uid()) = "profiles"."profile_id") WITH CHECK ((select auth.uid()) = "profiles"."profile_id");--> statement-breakpoint
+DO $$ BEGIN
+  CREATE POLICY "edit-profile-policy" ON "profiles" AS PERMISSIVE FOR UPDATE TO "authenticated" USING ((select auth.uid()) = "profiles"."profile_id") WITH CHECK ((select auth.uid()) = "profiles"."profile_id");
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
 -- Allow users to delete only their own profile
-CREATE POLICY "delete-profile-policy" ON "profiles" AS PERMISSIVE FOR DELETE TO "authenticated" USING ((select auth.uid()) = "profiles"."profile_id");--> statement-breakpoint
+DO $$ BEGIN
+  CREATE POLICY "delete-profile-policy" ON "profiles" AS PERMISSIVE FOR DELETE TO "authenticated" USING ((select auth.uid()) = "profiles"."profile_id");
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
 -- Allow users to view only their own profile
-CREATE POLICY "select-profile-policy" ON "profiles" AS PERMISSIVE FOR SELECT TO "authenticated" USING ((select auth.uid()) = "profiles"."profile_id");
+DO $$ BEGIN
+  CREATE POLICY "select-profile-policy" ON "profiles" AS PERMISSIVE FOR SELECT TO "authenticated" USING ((select auth.uid()) = "profiles"."profile_id");
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;

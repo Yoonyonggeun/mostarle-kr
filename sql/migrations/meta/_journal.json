@@ -15,6 +15,20 @@
       "when": 1744715791562,
       "tag": "0001_great_junta",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1767162596588,
+      "tag": "0002_elite_ozymandias",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1767162790385,
+      "tag": "0003_nice_nighthawk",
+      "breakpoints": true
     }
   ]
 }

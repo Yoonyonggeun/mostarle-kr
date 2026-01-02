@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      banners: {
+        Row: {
+          banner_id: number
+          created_at: string
+          created_by: string | null
+          display_order: number
+          image_url_desktop: string
+          image_url_mobile: string
+          is_active: boolean
+          link_url: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          banner_id?: never
+          created_at?: string
+          created_by?: string | null
+          display_order: number
+          image_url_desktop: string
+          image_url_mobile: string
+          is_active?: boolean
+          link_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          banner_id?: never
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          image_url_desktop?: string
+          image_url_mobile?: string
+          is_active?: boolean
+          link_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           approved_at: string
@@ -354,4 +393,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

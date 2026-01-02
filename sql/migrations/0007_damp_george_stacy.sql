@@ -1,0 +1,1 @@
+ALTER TABLE "banners" ALTER COLUMN "title" SET DEFAULT '배너';

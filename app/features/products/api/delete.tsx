@@ -192,7 +192,7 @@ export async function action({ request }: Route.ActionArgs) {
       .where(eq(products.product_id, validData.product_id));
 
     // Redirect to manage page
-    return redirect("/products/manage", { headers });
+    return redirect("/admin/products/manage", { headers });
   } catch (error) {
     return data(
       {

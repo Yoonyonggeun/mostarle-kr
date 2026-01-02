@@ -163,7 +163,7 @@ export default function ProductManageTable({
                 <TableCell>
                   <div className="flex gap-2">
                     <Button type="button" variant="outline" size="sm" asChild>
-                      <Link to={`/products/edit/${product.product_id}`}>
+                      <Link to={`/admin/products/edit/${product.product_id}`}>
                         <EditIcon className="size-4" />
                       </Link>
                     </Button>

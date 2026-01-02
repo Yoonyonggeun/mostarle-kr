@@ -46,6 +46,11 @@ export default [
       route("/delete", "features/products/api/delete.tsx"),
       route("/toggle-sold-out", "features/products/api/toggle-sold-out.tsx"),
     ]),
+    ...prefix("/banners", [
+      route("/create", "features/banners/api/create.tsx"),
+      route("/update", "features/banners/api/update.tsx"),
+      route("/delete", "features/banners/api/delete.tsx"),
+    ]),
     ...prefix("/cron", [route("/mailer", "features/cron/api/mailer.tsx")]),
   ]),
 
@@ -90,11 +95,24 @@ export default [
     ]),
   ]),
 
-  layout("core/layouts/private.layout.tsx", { id: "private-products" }, [
-    ...prefix("/products", [
-      route("/create", "features/products/screens/create.tsx"),
-      route("/manage", "features/products/screens/manage.tsx"),
-      route("/edit/:id", "features/products/screens/edit.tsx"),
+  // Admin routes with sidebar layout
+  layout("core/layouts/private.layout.tsx", { id: "private-admin" }, [
+    layout("features/admin/layouts/admin.layout.tsx", [
+      ...prefix("/admin", [
+        index("features/admin/screens/index.tsx"),
+        // Product management (moved from /products/*)
+        ...prefix("/products", [
+          route("/manage", "features/products/screens/manage.tsx"),
+          route("/create", "features/products/screens/create.tsx"),
+          route("/edit/:id", "features/products/screens/edit.tsx"),
+        ]),
+        // Banner management
+        ...prefix("/banners", [
+          route("/manage", "features/banners/screens/manage.tsx"),
+          route("/create", "features/banners/screens/create.tsx"),
+          route("/edit/:id", "features/banners/screens/edit.tsx"),
+        ]),
+      ]),
     ]),
   ]),
 

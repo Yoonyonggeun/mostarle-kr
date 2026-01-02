@@ -27,14 +27,22 @@ import { getMaxDisplayOrder } from "../lib/queries.server";
  */
 const bannerSchema = z.object({
   title: z.string().optional().default(""),
-  link_url: z.string().url("유효한 URL을 입력하세요").optional().or(z.literal("")),
+  link_url: z
+    .string()
+    .url("유효한 URL을 입력하세요")
+    .optional()
+    .or(z.literal("")),
   display_order: z.coerce.number().int().optional(),
   is_active: z
     .string()
     .optional()
     .transform((val) => val === "on" || val === "true"),
-  image_mobile: z.instanceof(File).refine((file) => file.size > 0, "모바일 이미지가 필요합니다"),
-  image_desktop: z.instanceof(File).refine((file) => file.size > 0, "PC 이미지가 필요합니다"),
+  image_mobile: z
+    .instanceof(File)
+    .refine((file) => file.size > 0, "모바일 이미지가 필요합니다"),
+  image_desktop: z
+    .instanceof(File)
+    .refine((file) => file.size > 0, "PC 이미지가 필요합니다"),
 });
 
 /**
@@ -79,7 +87,10 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   // Validate mobile image file
-  if (!(validData.image_mobile instanceof File) || validData.image_mobile.size === 0) {
+  if (
+    !(validData.image_mobile instanceof File) ||
+    validData.image_mobile.size === 0
+  ) {
     return data(
       { error: "모바일 이미지 파일이 필요합니다" },
       { status: 400, headers },
@@ -87,7 +98,10 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   // Validate desktop image file
-  if (!(validData.image_desktop instanceof File) || validData.image_desktop.size === 0) {
+  if (
+    !(validData.image_desktop instanceof File) ||
+    validData.image_desktop.size === 0
+  ) {
     return data(
       { error: "PC 이미지 파일이 필요합니다" },
       { status: 400, headers },
@@ -124,9 +138,11 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   // Get max display order if not provided
-  let displayOrder = validData.display_order;
-  if (displayOrder === undefined) {
+  let displayOrder: number;
+  if (validData.display_order === undefined) {
     displayOrder = (await getMaxDisplayOrder(client)) + 1;
+  } else {
+    displayOrder = validData.display_order;
   }
 
   // Track uploaded files for cleanup on failure
@@ -138,11 +154,12 @@ export async function action({ request }: Route.ActionArgs) {
     const mobileFileName = `${timestamp}-mobile-${validData.image_mobile.name}`;
     const mobileFilePath = `banners/${mobileFileName}`;
 
-    const { data: mobileUploadData, error: mobileUploadError } = await client.storage
-      .from("banners")
-      .upload(mobileFilePath, validData.image_mobile, {
-        upsert: false,
-      });
+    const { data: mobileUploadData, error: mobileUploadError } =
+      await client.storage
+        .from("banners")
+        .upload(mobileFilePath, validData.image_mobile, {
+          upsert: false,
+        });
 
     if (mobileUploadError) {
       console.error("Mobile image upload error:", mobileUploadError);
@@ -160,11 +177,12 @@ export async function action({ request }: Route.ActionArgs) {
     const desktopFileName = `${timestamp}-desktop-${validData.image_desktop.name}`;
     const desktopFilePath = `banners/${desktopFileName}`;
 
-    const { data: desktopUploadData, error: desktopUploadError } = await client.storage
-      .from("banners")
-      .upload(desktopFilePath, validData.image_desktop, {
-        upsert: false,
-      });
+    const { data: desktopUploadData, error: desktopUploadError } =
+      await client.storage
+        .from("banners")
+        .upload(desktopFilePath, validData.image_desktop, {
+          upsert: false,
+        });
 
     if (desktopUploadError) {
       // Clean up mobile image on failure
@@ -192,7 +210,10 @@ export async function action({ request }: Route.ActionArgs) {
     } = client.storage.from("banners").getPublicUrl(desktopFilePath);
 
     // Generate title from image filename if not provided
-    const bannerTitle = validData.title || validData.image_mobile.name.replace(/\.[^/.]+$/, "") || "배너";
+    const bannerTitle =
+      validData.title ||
+      validData.image_mobile.name.replace(/\.[^/.]+$/, "") ||
+      "배너";
 
     // Insert banner using Supabase client (to respect RLS)
     const { data: bannerData, error: insertError } = await client
@@ -234,19 +255,23 @@ export async function action({ request }: Route.ActionArgs) {
   } catch (error) {
     // Clean up uploaded files on error
     if (uploadedFiles.length > 0) {
-      await client.storage.from("banners").remove(uploadedFiles).catch((err) => {
-        console.error("Failed to clean up files:", err);
-      });
+      await client.storage
+        .from("banners")
+        .remove(uploadedFiles)
+        .catch((err) => {
+          console.error("Failed to clean up files:", err);
+        });
     }
 
     console.error("Unexpected error:", error);
     return data(
       {
         error:
-          error instanceof Error ? error.message : "배너 생성 중 오류가 발생했습니다",
+          error instanceof Error
+            ? error.message
+            : "배너 생성 중 오류가 발생했습니다",
       },
       { status: 500, headers },
     );
   }
 }
-

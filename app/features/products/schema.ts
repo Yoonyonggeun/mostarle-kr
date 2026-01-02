@@ -13,11 +13,22 @@ import {
   pgPolicy,
   pgTable,
   text,
+  timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
 import { authUid, authUsers, authenticatedRole } from "drizzle-orm/supabase";
 
-import { timestamps } from "~/core/db/helpers.server";
+/**
+ * Standard timestamp columns for database tables
+ *
+ * Adds created_at and updated_at columns to any table where this object is spread.
+ * Both columns are automatically set to the current timestamp when records are created,
+ * and updated_at is refreshed when records are updated.
+ */
+const timestamps = {
+  updated_at: timestamp().defaultNow().notNull(),
+  created_at: timestamp().defaultNow().notNull(),
+};
 
 /**
  * Products Table

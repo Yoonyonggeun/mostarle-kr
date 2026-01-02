@@ -234,10 +234,19 @@ export async function action({ request }: Route.ActionArgs) {
     }
   }
 
-  // Create product record
-  const [newProduct] = await db
-    .insert(products)
-    .values({
+  // Create product record using Supabase client (to respect RLS)
+  console.log("Creating product with data:", {
+    title: validData.title,
+    price: validData.price,
+    slug,
+    created_by: user.id,
+    images_count: validData.images.length,
+    details_count: validData.details.length,
+  });
+
+  const { data: newProduct, error: productInsertError } = await client
+    .from("products")
+    .insert({
       title: validData.title,
       price: validData.price,
       difficulty: validData.difficulty ?? null,
@@ -248,10 +257,37 @@ export async function action({ request }: Route.ActionArgs) {
       slug,
       created_by: user.id,
     })
-    .returning();
+    .select()
+    .single();
 
-  const productId = (newProduct as unknown as { product_id: number })
-    .product_id;
+  if (productInsertError || !newProduct) {
+    console.error("Product insert error:", productInsertError);
+    console.error("Product insert error details:", {
+      code: productInsertError?.code,
+      message: productInsertError?.message,
+      details: productInsertError?.details,
+      hint: productInsertError?.hint,
+    });
+    return data(
+      {
+        error: productInsertError
+          ? `상품 생성 실패: ${productInsertError.message}`
+          : "상품 생성 실패: 응답 데이터가 없습니다",
+      },
+      { status: 400, headers },
+    );
+  }
+
+  console.log("Product created successfully:", newProduct);
+  const productId = newProduct.product_id;
+
+  if (!productId || typeof productId !== "number") {
+    console.error("Invalid product ID:", productId);
+    return data(
+      { error: "상품 ID가 올바르게 생성되지 않았습니다" },
+      { status: 500, headers },
+    );
+  }
 
   // Track uploaded files for cleanup on error
   const uploadedFiles: string[] = [];
@@ -259,47 +295,93 @@ export async function action({ request }: Route.ActionArgs) {
   try {
     // Upload product images
     const imageUrls: Array<{ url: string; order: number }> = [];
+    console.log(`Starting upload of ${validData.images.length} product images`);
+
     for (let i = 0; i < validData.images.length; i++) {
       const image = validData.images[i];
       const timestamp = Date.now();
       const fileName = `${timestamp}-${image.name}`;
       const filePath = `products/${productId}/${fileName}`;
 
-      const { error: uploadError } = await client.storage
+      console.log(`Uploading image ${i + 1}/${validData.images.length}:`, {
+        fileName,
+        filePath,
+        size: image.size,
+        type: image.type,
+      });
+
+      const { data: uploadData, error: uploadError } = await client.storage
         .from("products")
         .upload(filePath, image, {
           upsert: false,
         });
 
       if (uploadError) {
+        console.error(`Image upload error for ${fileName}:`, uploadError);
+        console.error("Upload error details:", {
+          message: uploadError.message,
+        });
         // Clean up uploaded files
         if (uploadedFiles.length > 0) {
           await client.storage.from("products").remove(uploadedFiles);
         }
         return data(
-          { error: `이미지 업로드 실패: ${uploadError.message}` },
+          {
+            error: `이미지 업로드 실패: ${uploadError.message} (파일: ${image.name})`,
+          },
           { status: 400, headers },
         );
       }
 
+      console.log(`Image uploaded successfully:`, uploadData);
       uploadedFiles.push(filePath);
 
       const {
         data: { publicUrl },
       } = await client.storage.from("products").getPublicUrl(filePath);
 
+      console.log(`Public URL for image ${i + 1}:`, publicUrl);
       imageUrls.push({ url: publicUrl, order: i });
     }
 
-    // Insert product images
+    // Insert product images using Supabase client (to respect RLS)
     if (imageUrls.length > 0) {
-      await db.insert(productImages).values(
-        imageUrls.map(({ url, order }) => ({
-          product_id: productId,
-          image_url: url,
-          image_order: order,
-        })),
-      );
+      const imageRecords = imageUrls.map(({ url, order }) => ({
+        product_id: productId,
+        image_url: url,
+        image_order: order,
+      }));
+
+      console.log("Inserting product images:", {
+        productId,
+        count: imageRecords.length,
+        records: imageRecords,
+      });
+
+      const { data: insertedImages, error: insertError } = await client
+        .from("product_images")
+        .insert(imageRecords)
+        .select();
+
+      if (insertError) {
+        console.error("Product images insert error:", insertError);
+        // Clean up uploaded files
+        if (uploadedFiles.length > 0) {
+          await client.storage.from("products").remove(uploadedFiles);
+        }
+        // Clean up product record using Supabase client
+        try {
+          await client.from("products").delete().eq("product_id", productId);
+        } catch (deleteError) {
+          console.error("Failed to delete product record:", deleteError);
+        }
+        return data(
+          { error: `이미지 저장 실패: ${insertError.message}` },
+          { status: 400, headers },
+        );
+      }
+
+      console.log("Product images inserted successfully:", insertedImages);
     }
 
     // Upload detail images and create detail records
@@ -321,29 +403,47 @@ export async function action({ request }: Route.ActionArgs) {
           const fileName = `${timestamp}-${detail.image.name}`;
           const filePath = `products/${productId}/details/${i}/${fileName}`;
 
-          const { error: uploadError } = await client.storage
+          console.log(`Uploading detail image ${i + 1}:`, {
+            fileName,
+            filePath,
+            size: detail.image.size,
+            type: detail.image.type,
+          });
+
+          const { data: uploadData, error: uploadError } = await client.storage
             .from("products")
             .upload(filePath, detail.image, {
               upsert: false,
             });
 
           if (uploadError) {
+            console.error(
+              `Detail image upload error for ${fileName}:`,
+              uploadError,
+            );
+            console.error("Upload error details:", {
+              message: uploadError.message,
+            });
             // Clean up uploaded files
             if (uploadedFiles.length > 0) {
               await client.storage.from("products").remove(uploadedFiles);
             }
             return data(
-              { error: `상세 이미지 업로드 실패: ${uploadError.message}` },
+              {
+                error: `상세 이미지 업로드 실패: ${uploadError.message} (파일: ${detail.image.name})`,
+              },
               { status: 400, headers },
             );
           }
 
+          console.log(`Detail image uploaded successfully:`, uploadData);
           uploadedFiles.push(filePath);
 
           const {
             data: { publicUrl },
           } = await client.storage.from("products").getPublicUrl(filePath);
 
+          console.log(`Public URL for detail image ${i + 1}:`, publicUrl);
           detailImageUrl = publicUrl;
         }
 
@@ -356,8 +456,37 @@ export async function action({ request }: Route.ActionArgs) {
         });
       }
 
-      // Insert product details
-      await db.insert(productDetails).values(detailRecords);
+      // Insert product details using Supabase client (to respect RLS)
+      console.log("Inserting product details:", {
+        productId,
+        count: detailRecords.length,
+        records: detailRecords,
+      });
+
+      const { data: insertedDetails, error: detailInsertError } = await client
+        .from("product_details")
+        .insert(detailRecords)
+        .select();
+
+      if (detailInsertError) {
+        console.error("Product details insert error:", detailInsertError);
+        // Clean up uploaded files
+        if (uploadedFiles.length > 0) {
+          await client.storage.from("products").remove(uploadedFiles);
+        }
+        // Clean up product record using Supabase client
+        try {
+          await client.from("products").delete().eq("product_id", productId);
+        } catch (deleteError) {
+          console.error("Failed to delete product record:", deleteError);
+        }
+        return data(
+          { error: `상세 정보 저장 실패: ${detailInsertError.message}` },
+          { status: 400, headers },
+        );
+      }
+
+      console.log("Product details inserted successfully:", insertedDetails);
     }
 
     // Return success response
@@ -370,9 +499,16 @@ export async function action({ request }: Route.ActionArgs) {
       { headers },
     );
   } catch (error) {
+    console.error("Unexpected error during product creation:", error);
+    console.error(
+      "Error stack:",
+      error instanceof Error ? error.stack : "No stack trace",
+    );
+
     // Clean up uploaded files on error
     if (uploadedFiles.length > 0) {
       try {
+        console.log(`Cleaning up ${uploadedFiles.length} uploaded files`);
         await client.storage.from("products").remove(uploadedFiles);
       } catch (cleanupError) {
         // Log cleanup error but don't fail the request
@@ -381,20 +517,21 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     // Clean up product record
-    try {
-      await db
-        .delete(products)
-        .where(eq((products as any).product_id, productId));
-    } catch (deleteError) {
-      console.error("Failed to delete product record:", deleteError);
+    if (productId) {
+      try {
+        console.log(`Cleaning up product record with ID: ${productId}`);
+        await client.from("products").delete().eq("product_id", productId);
+      } catch (deleteError) {
+        console.error("Failed to delete product record:", deleteError);
+      }
     }
 
     return data(
       {
         error:
           error instanceof Error
-            ? error.message
-            : "상품 생성 중 오류가 발생했습니다",
+            ? `상품 생성 중 오류가 발생했습니다: ${error.message}`
+            : "상품 생성 중 알 수 없는 오류가 발생했습니다",
       },
       { status: 500, headers },
     );

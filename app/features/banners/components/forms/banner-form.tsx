@@ -24,7 +24,6 @@ import { cn } from "~/core/lib/utils";
 
 interface Banner {
   banner_id: number;
-  title: string;
   image_url_mobile: string;
   image_url_desktop: string;
   link_url: string | null;
@@ -99,8 +98,6 @@ export default function BannerForm({
     e.preventDefault();
 
     const formData = new FormData();
-    // Title is optional, use empty string or image filename as default
-    formData.append("title", "");
     if (linkUrl) {
       formData.append("link_url", linkUrl);
     }

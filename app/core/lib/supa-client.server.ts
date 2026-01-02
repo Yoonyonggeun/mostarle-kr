@@ -17,6 +17,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "database.types";
 
+import { createClient } from "@supabase/supabase-js";
 import {
   createServerClient,
   parseCookieHeader,
@@ -79,4 +80,25 @@ export default function makeServerClient(
 
   // Return both the client and headers
   return [client, headers];
+}
+
+/**
+ * Creates a public Supabase client for anonymous server-side operations
+ * 
+ * This function creates a Supabase client that can be used for public data access
+ * without authentication. It uses the ANON_KEY and does not handle cookies since
+ * no authentication session is needed.
+ * 
+ * This is useful for:
+ * - Public pages that don't require authentication (e.g., home page)
+ * - Fetching public data that has RLS policies allowing anonymous access
+ * - Server-side operations that don't need user context
+ * 
+ * @returns A Supabase client instance for anonymous/public operations
+ */
+export function makePublicClient(): SupabaseClient<Database> {
+  return createClient<Database>(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_ANON_KEY!,
+  );
 }

@@ -30,7 +30,6 @@ import { cn } from "~/core/lib/utils";
 
 interface Banner {
   banner_id: number;
-  title: string;
   image_url_mobile: string;
   image_url_desktop: string;
   link_url: string | null;
@@ -75,7 +74,6 @@ export default function BannerManageTable({
         <TableHeader>
           <TableRow>
             <TableHead className="w-[150px]">이미지</TableHead>
-            <TableHead>제목</TableHead>
             <TableHead className="w-[200px]">링크 URL</TableHead>
             <TableHead className="w-[100px]">순서</TableHead>
             <TableHead className="w-[100px]">상태</TableHead>
@@ -86,7 +84,7 @@ export default function BannerManageTable({
           {banners.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={6}
+                colSpan={5}
                 className="text-muted-foreground text-center"
               >
                 등록된 배너가 없습니다
@@ -104,7 +102,7 @@ export default function BannerManageTable({
                       {banner.image_url_mobile ? (
                         <img
                           src={banner.image_url_mobile}
-                          alt={`${banner.title} (모바일)`}
+                          alt="모바일 배너"
                           className="h-full w-full object-cover"
                         />
                       ) : (
@@ -119,7 +117,7 @@ export default function BannerManageTable({
                       {banner.image_url_desktop ? (
                         <img
                           src={banner.image_url_desktop}
-                          alt={`${banner.title} (PC)`}
+                          alt="PC 배너"
                           className="h-full w-full object-cover"
                         />
                       ) : (
@@ -132,7 +130,6 @@ export default function BannerManageTable({
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="font-medium">{banner.title}</TableCell>
                 <TableCell>
                   {banner.link_url ? (
                     <a

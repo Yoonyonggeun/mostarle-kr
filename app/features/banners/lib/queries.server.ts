@@ -83,3 +83,27 @@ export async function getMaxDisplayOrder(client: SupabaseClient) {
   return data?.display_order || 0;
 }
 
+/**
+ * Get all active banners ordered by display_order
+ * 
+ * This function is designed for public display on the home page.
+ * It only returns banners that are marked as active (is_active = true).
+ * 
+ * @param client - Supabase client instance (can be anonymous/public client)
+ * @returns Array of active banners sorted by display_order
+ */
+export async function getActiveBanners(client: SupabaseClient) {
+  const { data, error } = await client
+    .from("banners")
+    .select("*")
+    .eq("is_active", true)
+    .order("display_order", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching active banners:", error);
+    throw new Error(`Failed to fetch active banners: ${error.message}`);
+  }
+
+  return data || [];
+}
+

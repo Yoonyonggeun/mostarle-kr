@@ -16,7 +16,12 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
-import { authUid, authUsers, authenticatedRole } from "drizzle-orm/supabase";
+import {
+  anonRole,
+  authUid,
+  authUsers,
+  authenticatedRole,
+} from "drizzle-orm/supabase";
 
 /**
  * Standard timestamp columns for database tables
@@ -33,7 +38,7 @@ const timestamps = {
 /**
  * Banners Table
  *
- * Stores banner information including title, mobile/desktop image URLs, link URL, display order,
+ * Stores banner information including mobile/desktop image URLs, link URL, display order,
  * and active status. Links to Supabase auth.users table via created_by foreign key.
  *
  * Includes Row Level Security (RLS) policies to ensure only administrators
@@ -46,8 +51,6 @@ export const banners = pgTable(
     banner_id: bigint({ mode: "number" })
       .primaryKey()
       .generatedAlwaysAsIdentity(),
-    // Banner title (optional, defaults to image filename if not provided)
-    title: text().notNull().default("배너"),
     // Supabase Storage URL for the mobile banner image
     image_url_mobile: text().notNull(),
     // Supabase Storage URL for the desktop/PC banner image
@@ -82,6 +85,13 @@ export const banners = pgTable(
       to: authenticatedRole,
       as: "permissive",
       using: sql`true`, // Allow all authenticated users to view (admin check at app level)
+    }),
+    // RLS Policy: Anonymous users can view active banners for public display
+    pgPolicy("select-banner-public-policy", {
+      for: "select",
+      to: anonRole,
+      as: "permissive",
+      using: sql`${table.is_active} = true`, // Only active banners are publicly visible
     }),
     // RLS Policy: Authenticated users can update banners
     // Note: Admin email check is performed at application level via requireAdminEmail guard

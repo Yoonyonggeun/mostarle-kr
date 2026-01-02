@@ -14,7 +14,7 @@
  */
 import type { Route } from "./+types/update";
 
-import { data } from "react-router";
+import { data, redirect } from "react-router";
 import { z } from "zod";
 
 import { requireAdminEmail, requireMethod } from "~/core/lib/guards.server";
@@ -48,7 +48,6 @@ function extractFilePathFromUrl(url: string): string | null {
  */
 const bannerUpdateSchema = z.object({
   banner_id: z.coerce.number().int().positive("배너 ID는 양수여야 합니다"),
-  title: z.string().optional().default(""),
   link_url: z.string().url("유효한 URL을 입력하세요").optional().or(z.literal("")),
   display_order: z.coerce.number().int().optional(),
   is_active: z
@@ -75,15 +74,25 @@ export async function action({ request }: Route.ActionArgs) {
   // Extract form data
   const formData = await request.formData();
 
+  // Extract image files (handle null/empty values)
+  const imageMobile = formData.get("image_mobile");
+  const imageDesktop = formData.get("image_desktop");
+
   // Prepare data for validation
   const dataToValidate = {
     banner_id: formData.get("banner_id"),
-    title: formData.get("title"),
     link_url: formData.get("link_url"),
     display_order: formData.get("display_order"),
     is_active: formData.get("is_active"),
-    image_mobile: formData.get("image_mobile"),
-    image_desktop: formData.get("image_desktop"),
+    // Only include file if it's a valid File instance with size > 0
+    image_mobile:
+      imageMobile instanceof File && imageMobile.size > 0
+        ? imageMobile
+        : undefined,
+    image_desktop:
+      imageDesktop instanceof File && imageDesktop.size > 0
+        ? imageDesktop
+        : undefined,
   };
 
   // Validate form data
@@ -244,31 +253,20 @@ export async function action({ request }: Route.ActionArgs) {
       newDesktopImageUrl = publicUrl;
     }
 
-    // Generate title from image filename if not provided and new image is uploaded
-    const bannerTitle = validData.title || 
-      (validData.image_mobile instanceof File && validData.image_mobile.size > 0
-        ? validData.image_mobile.name.replace(/\.[^/.]+$/, "") || "배너"
-        : existingBanner.title);
-
     // Update banner using Supabase client (to respect RLS)
     const updateData: {
-      title: string;
       image_url_mobile: string;
       image_url_desktop: string;
       link_url: string | null;
-      display_order?: number;
+      display_order: number;
       is_active: boolean;
     } = {
-      title: bannerTitle,
       image_url_mobile: newMobileImageUrl,
       image_url_desktop: newDesktopImageUrl,
       link_url: validData.link_url || null,
+      display_order: validData.display_order ?? existingBanner.display_order,
       is_active: validData.is_active ?? existingBanner.is_active,
     };
-
-    if (validData.display_order !== undefined) {
-      updateData.display_order = validData.display_order;
-    }
 
     const { data: bannerData, error: updateError } = await client
       .from("banners")
@@ -291,14 +289,8 @@ export async function action({ request }: Route.ActionArgs) {
       );
     }
 
-    // Return success response
-    return data(
-      {
-        success: true,
-        banner: bannerData,
-      },
-      { status: 200, headers },
-    );
+    // Redirect to banner list page on success
+    return redirect("/admin/banners/manage", { headers });
   } catch (error) {
     // Clean up uploaded files on error
     if (uploadedFiles.length > 0) {

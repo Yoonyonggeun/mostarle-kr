@@ -24,7 +24,6 @@ export type Database = {
           image_url_mobile: string
           is_active: boolean
           link_url: string | null
-          title: string
           updated_at: string
         }
         Insert: {
@@ -36,7 +35,6 @@ export type Database = {
           image_url_mobile: string
           is_active?: boolean
           link_url?: string | null
-          title?: string
           updated_at?: string
         }
         Update: {
@@ -48,7 +46,6 @@ export type Database = {
           image_url_mobile?: string
           is_active?: boolean
           link_url?: string | null
-          title?: string
           updated_at?: string
         }
         Relationships: []

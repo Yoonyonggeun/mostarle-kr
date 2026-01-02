@@ -14,7 +14,7 @@
  */
 import type { Route } from "./+types/create";
 
-import { data } from "react-router";
+import { data, redirect } from "react-router";
 import { z } from "zod";
 
 import { requireAdminEmail, requireMethod } from "~/core/lib/guards.server";
@@ -26,7 +26,6 @@ import { getMaxDisplayOrder } from "../lib/queries.server";
  * Validation schema for banner creation form data
  */
 const bannerSchema = z.object({
-  title: z.string().optional().default(""),
   link_url: z
     .string()
     .url("유효한 URL을 입력하세요")
@@ -63,7 +62,6 @@ export async function action({ request }: Route.ActionArgs) {
 
   // Prepare data for validation
   const dataToValidate = {
-    title: formData.get("title"),
     link_url: formData.get("link_url"),
     display_order: formData.get("display_order"),
     is_active: formData.get("is_active"),
@@ -209,17 +207,10 @@ export async function action({ request }: Route.ActionArgs) {
       data: { publicUrl: desktopPublicUrl },
     } = client.storage.from("banners").getPublicUrl(desktopFilePath);
 
-    // Generate title from image filename if not provided
-    const bannerTitle =
-      validData.title ||
-      validData.image_mobile.name.replace(/\.[^/.]+$/, "") ||
-      "배너";
-
     // Insert banner using Supabase client (to respect RLS)
     const { data: bannerData, error: insertError } = await client
       .from("banners")
       .insert({
-        title: bannerTitle,
         image_url_mobile: mobilePublicUrl,
         image_url_desktop: desktopPublicUrl,
         link_url: validData.link_url || null,
@@ -244,14 +235,8 @@ export async function action({ request }: Route.ActionArgs) {
       );
     }
 
-    // Return success response
-    return data(
-      {
-        success: true,
-        banner: bannerData,
-      },
-      { status: 201, headers },
-    );
+    // Redirect to banner list page on success
+    return redirect("/admin/banners/manage", { headers });
   } catch (error) {
     // Clean up uploaded files on error
     if (uploadedFiles.length > 0) {

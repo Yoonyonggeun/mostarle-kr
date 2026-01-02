@@ -340,11 +340,11 @@ export default function CreateProductForm({
   const handleImageDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (draggedImageId && draggedImageId !== targetId) {
       const draggedIndex = images.findIndex((img) => img.id === draggedImageId);
       const targetIndex = images.findIndex((img) => img.id === targetId);
-      
+
       if (draggedIndex !== -1 && targetIndex !== -1) {
         const newImages = [...images];
         const [removed] = newImages.splice(draggedIndex, 1);
@@ -352,7 +352,7 @@ export default function CreateProductForm({
         setImages(newImages);
       }
     }
-    
+
     setDraggedImageId(null);
     setDragOverImageId(null);
   };
@@ -382,11 +382,11 @@ export default function CreateProductForm({
   const handleDetailDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (draggedDetailId && draggedDetailId !== targetId) {
       const draggedIndex = details.findIndex((d) => d.id === draggedDetailId);
       const targetIndex = details.findIndex((d) => d.id === targetId);
-      
+
       if (draggedIndex !== -1 && targetIndex !== -1) {
         const newDetails = [...details];
         const [removed] = newDetails.splice(draggedIndex, 1);
@@ -394,7 +394,7 @@ export default function CreateProductForm({
         setDetails(newDetails);
       }
     }
-    
+
     setDraggedDetailId(null);
     setDragOverDetailId(null);
   };
@@ -713,8 +713,10 @@ export default function CreateProductForm({
                     onDragEnd={handleImageDragEnd}
                     className={cn(
                       "group relative cursor-move rounded-lg border-2 border-dashed p-2 transition-all duration-200",
-                      draggedImageId === img.id && "opacity-50 scale-95",
-                      dragOverImageId === img.id && draggedImageId !== img.id && "border-primary scale-105 shadow-lg",
+                      draggedImageId === img.id && "scale-95 opacity-50",
+                      dragOverImageId === img.id &&
+                        draggedImageId !== img.id &&
+                        "border-primary scale-105 shadow-lg",
                       img.existingId && "border-blue-300",
                       !draggedImageId && "border-gray-300",
                     )}
@@ -779,8 +781,10 @@ export default function CreateProductForm({
                 onDragEnd={handleDetailDragEnd}
                 className={cn(
                   "relative border-2 transition-all duration-200",
-                  draggedDetailId === detail.id && "opacity-50 scale-95",
-                  dragOverDetailId === detail.id && draggedDetailId !== detail.id && "border-primary scale-105 shadow-lg",
+                  draggedDetailId === detail.id && "scale-95 opacity-50",
+                  dragOverDetailId === detail.id &&
+                    draggedDetailId !== detail.id &&
+                    "border-primary scale-105 shadow-lg",
                   !draggedDetailId && "border-gray-300",
                 )}
               >

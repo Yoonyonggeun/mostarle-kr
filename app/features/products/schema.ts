@@ -16,7 +16,7 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
-import { authUid, authUsers, authenticatedRole } from "drizzle-orm/supabase";
+import { anonRole, authUid, authUsers, authenticatedRole } from "drizzle-orm/supabase";
 
 /**
  * Standard timestamp columns for database tables
@@ -85,6 +85,13 @@ export const products = pgTable(
       as: "permissive",
       using: sql`${authUid} = ${table.created_by}`,
     }),
+    // RLS Policy: Anonymous users can view all products for public display
+    pgPolicy("select-product-public-policy", {
+      for: "select",
+      to: anonRole,
+      as: "permissive",
+      using: sql`true`, // All products are publicly visible (filtering done at app level)
+    }),
     // RLS Policy: Users can only update their own products
     pgPolicy("update-product-policy", {
       for: "update",
@@ -152,6 +159,13 @@ export const productImages = pgTable(
         WHERE ${products.product_id} = ${table.product_id}
         AND ${products.created_by} = ${authUid}
       )`,
+    }),
+    // RLS Policy: Anonymous users can view images of all products for public display
+    pgPolicy("select-product-image-public-policy", {
+      for: "select",
+      to: anonRole,
+      as: "permissive",
+      using: sql`true`, // All product images are publicly visible
     }),
     // RLS Policy: Users can only update images of their own products
     pgPolicy("update-product-image-policy", {

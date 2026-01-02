@@ -32,9 +32,14 @@ export function ProductList({ products }: ProductListProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="scrollbar-hide flex gap-4 overflow-x-auto pb-4 [-webkit-overflow-scrolling:touch] lg:grid lg:grid-cols-4 lg:gap-6 lg:overflow-x-visible lg:pb-0">
       {products.map((product) => (
-        <ProductCard key={product.product_id} product={product} />
+        <div
+          key={product.product_id}
+          className="w-[240px] flex-shrink-0 lg:w-auto"
+        >
+          <ProductCard product={product} />
+        </div>
       ))}
     </div>
   );

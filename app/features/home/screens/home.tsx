@@ -77,7 +77,6 @@ export async function loader({ request }: Route.LoaderArgs) {
       return [];
     }),
   ]);
-  console.log(products);
 
   // Return translated strings and data for use in both the component and meta function
   return {

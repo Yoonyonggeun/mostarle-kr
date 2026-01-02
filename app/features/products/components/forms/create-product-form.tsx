@@ -123,6 +123,8 @@ export default function CreateProductForm({
   // Drag and drop state
   const [draggedImageId, setDraggedImageId] = useState<string | null>(null);
   const [draggedDetailId, setDraggedDetailId] = useState<string | null>(null);
+  const [dragOverImageId, setDragOverImageId] = useState<string | null>(null);
+  const [dragOverDetailId, setDragOverDetailId] = useState<string | null>(null);
 
   // Initialize form with initial data
   useEffect(() => {
@@ -325,21 +327,39 @@ export default function CreateProductForm({
 
   const handleImageDragOver = (e: React.DragEvent, id: string) => {
     e.preventDefault();
+    e.stopPropagation();
     if (draggedImageId && draggedImageId !== id) {
+      setDragOverImageId(id);
+    }
+  };
+
+  const handleImageDragLeave = () => {
+    setDragOverImageId(null);
+  };
+
+  const handleImageDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (draggedImageId && draggedImageId !== targetId) {
       const draggedIndex = images.findIndex((img) => img.id === draggedImageId);
-      const targetIndex = images.findIndex((img) => img.id === id);
+      const targetIndex = images.findIndex((img) => img.id === targetId);
+      
       if (draggedIndex !== -1 && targetIndex !== -1) {
         const newImages = [...images];
         const [removed] = newImages.splice(draggedIndex, 1);
         newImages.splice(targetIndex, 0, removed);
         setImages(newImages);
-        setDraggedImageId(id);
       }
     }
+    
+    setDraggedImageId(null);
+    setDragOverImageId(null);
   };
 
   const handleImageDragEnd = () => {
     setDraggedImageId(null);
+    setDragOverImageId(null);
   };
 
   // Drag and drop handlers for details
@@ -349,21 +369,39 @@ export default function CreateProductForm({
 
   const handleDetailDragOver = (e: React.DragEvent, id: string) => {
     e.preventDefault();
+    e.stopPropagation();
     if (draggedDetailId && draggedDetailId !== id) {
+      setDragOverDetailId(id);
+    }
+  };
+
+  const handleDetailDragLeave = () => {
+    setDragOverDetailId(null);
+  };
+
+  const handleDetailDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (draggedDetailId && draggedDetailId !== targetId) {
       const draggedIndex = details.findIndex((d) => d.id === draggedDetailId);
-      const targetIndex = details.findIndex((d) => d.id === id);
+      const targetIndex = details.findIndex((d) => d.id === targetId);
+      
       if (draggedIndex !== -1 && targetIndex !== -1) {
         const newDetails = [...details];
         const [removed] = newDetails.splice(draggedIndex, 1);
         newDetails.splice(targetIndex, 0, removed);
         setDetails(newDetails);
-        setDraggedDetailId(id);
       }
     }
+    
+    setDraggedDetailId(null);
+    setDragOverDetailId(null);
   };
 
   const handleDetailDragEnd = () => {
     setDraggedDetailId(null);
+    setDragOverDetailId(null);
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -408,33 +446,49 @@ export default function CreateProductForm({
       formData.append("slug", slug);
     }
 
-    // Add existing image IDs (for edit mode)
+    // Add existing image IDs in the current order (for edit mode)
+    // This preserves the order after drag and drop
     if (mode === "edit") {
-      existingImageIds.forEach((id) => {
-        formData.append("existing_image_ids", id.toString());
+      images.forEach((img) => {
+        if (img.existingId) {
+          formData.append("existing_image_ids", img.existingId.toString());
+        }
       });
     }
 
-    // Add new images (only files, not existing ones)
+    // Add new images (only files, not existing ones) in the current order
     images.forEach((img) => {
       if (img.file && img.file.size > 0 && !img.existingId) {
         formData.append("images", img.file);
       }
     });
 
-    // Add existing detail IDs (for edit mode)
+    // Add existing detail IDs in the current order (for edit mode)
+    // This preserves the order after drag and drop
     if (mode === "edit") {
-      existingDetailIds.forEach((id) => {
-        formData.append("existing_detail_ids", id.toString());
+      details.forEach((detail) => {
+        if (detail.id.startsWith("existing-")) {
+          const detailId = parseInt(detail.id.replace("existing-", ""), 10);
+          if (!isNaN(detailId)) {
+            formData.append("existing_detail_ids", detailId.toString());
+          }
+        }
       });
     }
 
-    // Add details
+    // Add details in the current order (preserves drag and drop order)
     details.forEach((detail, index) => {
       formData.append(`details[${index}].title`, detail.title);
       formData.append(`details[${index}].description`, detail.description);
-      // Only add image if it's a new file
-      if (detail.image && !detail.id.startsWith("existing-")) {
+      // 기존 detail의 detail_id 전송 (edit 모드에서)
+      if (mode === "edit" && detail.id.startsWith("existing-")) {
+        const detailId = parseInt(detail.id.replace("existing-", ""), 10);
+        if (!isNaN(detailId)) {
+          formData.append(`details[${index}].detail_id`, detailId.toString());
+        }
+      }
+      // Add image if it's a new file (including when replacing existing detail image)
+      if (detail.image) {
         formData.append(`details[${index}].image`, detail.image);
       }
     });
@@ -654,11 +708,15 @@ export default function CreateProductForm({
                     draggable
                     onDragStart={() => handleImageDragStart(img.id)}
                     onDragOver={(e) => handleImageDragOver(e, img.id)}
+                    onDragLeave={handleImageDragLeave}
+                    onDrop={(e) => handleImageDrop(e, img.id)}
                     onDragEnd={handleImageDragEnd}
                     className={cn(
-                      "group relative cursor-move rounded-lg border-2 border-dashed p-2 transition-colors",
-                      draggedImageId === img.id && "border-primary opacity-50",
+                      "group relative cursor-move rounded-lg border-2 border-dashed p-2 transition-all duration-200",
+                      draggedImageId === img.id && "opacity-50 scale-95",
+                      dragOverImageId === img.id && draggedImageId !== img.id && "border-primary scale-105 shadow-lg",
                       img.existingId && "border-blue-300",
+                      !draggedImageId && "border-gray-300",
                     )}
                   >
                     <div className="relative aspect-square w-full overflow-hidden rounded-md">
@@ -716,10 +774,14 @@ export default function CreateProductForm({
                 draggable
                 onDragStart={() => handleDetailDragStart(detail.id)}
                 onDragOver={(e) => handleDetailDragOver(e, detail.id)}
+                onDragLeave={handleDetailDragLeave}
+                onDrop={(e) => handleDetailDrop(e, detail.id)}
                 onDragEnd={handleDetailDragEnd}
                 className={cn(
-                  "relative border-2 transition-colors",
-                  draggedDetailId === detail.id && "border-primary opacity-50",
+                  "relative border-2 transition-all duration-200",
+                  draggedDetailId === detail.id && "opacity-50 scale-95",
+                  dragOverDetailId === detail.id && draggedDetailId !== detail.id && "border-primary scale-105 shadow-lg",
+                  !draggedDetailId && "border-gray-300",
                 )}
               >
                 <CardHeader className="pb-3">

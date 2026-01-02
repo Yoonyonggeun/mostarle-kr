@@ -82,6 +82,7 @@ const productUpdateSchema = z.object({
         title: z.string().min(1, "상세 제목은 필수입니다"),
         description: z.string().min(1, "상세 설명은 필수입니다"),
         image: z.instanceof(File).optional(),
+        detail_id: z.coerce.number().optional(), // 기존 detail의 ID (edit 모드에서)
       }),
     )
     .optional()
@@ -194,6 +195,7 @@ export async function action({ request }: Route.ActionArgs) {
     title: string;
     description: string;
     image?: File;
+    detail_id?: number;
   }> = [];
   const existingImageIds: number[] = [];
   const existingDetailIds: number[] = [];
@@ -239,12 +241,15 @@ export async function action({ request }: Route.ActionArgs) {
     const title = formData.get(`details[${index}].title`) as string;
     const description = formData.get(`details[${index}].description`) as string;
     const image = formData.get(`details[${index}].image`);
+    const detailIdStr = formData.get(`details[${index}].detail_id`) as string;
+    const detailId = detailIdStr ? parseInt(detailIdStr, 10) : undefined;
 
     if (title && description) {
       details.push({
         title,
         description,
         image: image instanceof File && image.size > 0 ? image : undefined,
+        detail_id: detailId && !isNaN(detailId) ? detailId : undefined,
       });
     }
   }
@@ -400,13 +405,19 @@ export async function action({ request }: Route.ActionArgs) {
         );
       }
 
-      // If we're keeping some images, we'll re-insert them later with new order
-      // Otherwise, delete all images for this product
-      const imagesToKeep = existingImages.filter((img) =>
-        validData.existing_image_ids.includes(Number(img.image_id)),
-      );
-      if (imagesToKeep.length === 0) {
-        // Delete all remaining images for this product
+      // 이미지 삭제는 이미 위에서 처리됨 (imagesToDelete)
+    } else {
+      // imagesToDelete.length === 0인 경우
+      // 기존 이미지를 모두 유지하는 경우이거나, 모든 이미지를 교체하는 경우
+
+      // 모든 기존 이미지를 삭제하는 경우는:
+      // 1. 유지할 기존 이미지가 없고 (existing_image_ids.length === 0)
+      // 2. 새 이미지가 있는 경우 (images.length > 0)
+      if (
+        validData.existing_image_ids.length === 0 &&
+        validData.images.length > 0
+      ) {
+        // 모든 기존 이미지를 삭제하고 새 이미지로 교체
         const { error: deleteAllError } = await client
           .from("product_images")
           .delete()
@@ -419,38 +430,35 @@ export async function action({ request }: Route.ActionArgs) {
           );
         }
       }
-    } else {
-      // Delete all existing images if we're replacing them
-      if (
-        validData.images.length > 0 ||
-        validData.existing_image_ids.length === 0
-      ) {
-        const { error: deleteAllError } = await client
-          .from("product_images")
-          .delete()
-          .eq("product_id", validData.product_id);
+      // 그 외의 경우 (기존 이미지를 유지하는 경우)는 아무것도 하지 않음
+    }
 
-        if (deleteAllError) {
+    // Handle existing images - update order only (don't re-insert)
+    // Sort by the order in validData.existing_image_ids (form submission order)
+    const existingImagesToKeep = validData.existing_image_ids
+      .map((id) => existingImages.find((img) => img.image_id === id))
+      .filter((img): img is NonNullable<typeof img> => img !== undefined);
+
+    // Update order for existing images in the form submission order
+    if (existingImagesToKeep.length > 0) {
+      for (let i = 0; i < existingImagesToKeep.length; i++) {
+        const img = existingImagesToKeep[i];
+        const { error: updateError } = await client
+          .from("product_images")
+          .update({ image_order: i })
+          .eq("image_id", img.image_id);
+
+        if (updateError) {
           return data(
-            { error: `이미지 삭제 실패: ${deleteAllError.message}` },
+            { error: `이미지 순서 업데이트 실패: ${updateError.message}` },
             { status: 400, headers },
           );
         }
       }
     }
 
-    // Upload new product images
-    const imageUrls: Array<{ url: string; order: number }> = [];
-    const existingImagesToKeep = existingImages.filter((img) =>
-      validData.existing_image_ids.includes(Number(img.image_id)),
-    );
-
-    // Add existing images first
-    existingImagesToKeep.forEach((img, index) => {
-      imageUrls.push({ url: img.image_url, order: index });
-    });
-
-    // Upload and add new images
+    // Upload and insert only new images
+    const newImageStartOrder = existingImagesToKeep.length;
     for (let i = 0; i < validData.images.length; i++) {
       const image = validData.images[i];
       const timestamp = Date.now();
@@ -480,21 +488,14 @@ export async function action({ request }: Route.ActionArgs) {
         data: { publicUrl },
       } = await client.storage.from("products").getPublicUrl(filePath);
 
-      imageUrls.push({
-        url: publicUrl,
-        order: existingImagesToKeep.length + i,
-      });
-    }
-
-    // Insert product images using Supabase client (to respect RLS)
-    if (imageUrls.length > 0) {
-      const { error: insertError } = await client.from("product_images").insert(
-        imageUrls.map(({ url, order }) => ({
+      // Insert only new images
+      const { error: insertError } = await client
+        .from("product_images")
+        .insert({
           product_id: validData.product_id,
-          image_url: url,
-          image_order: order,
-        })),
-      );
+          image_url: publicUrl,
+          image_order: newImageStartOrder + i,
+        });
 
       if (insertError) {
         // Clean up uploaded files
@@ -571,12 +572,33 @@ export async function action({ request }: Route.ActionArgs) {
         const detail = validData.details[i];
         let detailImageUrl: string | null = null;
 
-        // Check if this detail should keep its existing image
-        const existingDetail = existingDetails.find((d) =>
-          validData.existing_detail_ids.includes(Number(d.detail_id)),
-        );
+        // Find the specific existing detail by detail_id
+        let existingDetail = null;
+        if (detail.detail_id) {
+          existingDetail = existingDetails.find(
+            (d) => d.detail_id === detail.detail_id,
+          );
+        }
 
         if (detail.image) {
+          // Delete old image if replacing existing detail image
+          if (existingDetail?.detail_image_url) {
+            const oldFilePath = extractFilePathFromUrl(
+              existingDetail.detail_image_url,
+            );
+            if (oldFilePath) {
+              try {
+                await client.storage.from("products").remove([oldFilePath]);
+              } catch (error) {
+                // Log but don't fail
+                console.error(
+                  "Failed to delete old detail image from storage:",
+                  error,
+                );
+              }
+            }
+          }
+
           // Upload new image
           const timestamp = Date.now();
           const fileName = `${timestamp}-${detail.image.name}`;
@@ -607,7 +629,7 @@ export async function action({ request }: Route.ActionArgs) {
 
           detailImageUrl = publicUrl;
         } else if (existingDetail?.detail_image_url) {
-          // Keep existing image
+          // Keep existing image from the matched detail
           detailImageUrl = existingDetail.detail_image_url;
         }
 

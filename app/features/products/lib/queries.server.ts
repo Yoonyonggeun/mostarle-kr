@@ -115,3 +115,83 @@ export async function getAllPublicProducts(
 
   return productsWithFirstImage;
 }
+
+/**
+ * Get a single product by slug with all images and details
+ *
+ * This function fetches a single product by its slug, including all product images
+ * sorted by image_order and all product details sorted by detail_order.
+ * Unlike getAllPublicProducts, this function does not filter out sold-out products,
+ * as product detail pages should display all products regardless of availability.
+ * The RLS policies allow anonymous users to view all products.
+ *
+ * @param client - Supabase client instance (can be anonymous/public client)
+ * @param slug - The slug of the product to retrieve
+ * @returns A product record with images and details, or null if not found
+ * @throws Will throw an error if the database query fails
+ */
+export async function getProductBySlug(
+  client: SupabaseClient<Database>,
+  slug: string,
+) {
+  // Query product by slug with images and details
+  const { data: product, error: productError } = await client
+    .from("products")
+    .select(
+      `
+      *,
+      product_images (
+        image_id,
+        image_url,
+        image_order
+      ),
+      product_details (
+        detail_id,
+        detail_title,
+        detail_description,
+        detail_image_url,
+        detail_order
+      )
+    `,
+    )
+    .eq("slug", slug)
+    .single();
+
+  if (productError) {
+    // If product not found, return null
+    if (productError.code === "PGRST116") {
+      return null;
+    }
+    throw productError;
+  }
+
+  if (!product) {
+    return null;
+  }
+
+  // Sort images by image_order
+  const images =
+    (product.product_images as Array<{
+      image_id: number;
+      image_url: string;
+      image_order: number;
+    }> | null) || [];
+  const sortedImages = images.sort((a, b) => a.image_order - b.image_order);
+
+  // Sort details by detail_order
+  const details =
+    (product.product_details as Array<{
+      detail_id: number;
+      detail_title: string;
+      detail_description: string;
+      detail_image_url: string | null;
+      detail_order: number;
+    }> | null) || [];
+  const sortedDetails = details.sort((a, b) => a.detail_order - b.detail_order);
+
+  return {
+    ...product,
+    product_images: sortedImages,
+    product_details: sortedDetails,
+  };
+}

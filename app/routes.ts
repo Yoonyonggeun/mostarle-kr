@@ -57,6 +57,7 @@ export default [
   layout("core/layouts/navigation.layout.tsx", [
     route("/auth/confirm", "features/auth/screens/confirm.tsx"),
     index("features/home/screens/home.tsx"),
+    route("/products/:slug", "features/products/screens/detail.tsx"),
     route("/error", "core/screens/error.tsx"),
     layout("core/layouts/public.layout.tsx", [
       // Routes that should only be visible to unauthenticated users.

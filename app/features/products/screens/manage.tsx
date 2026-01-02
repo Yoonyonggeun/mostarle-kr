@@ -34,6 +34,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // Fetch products
   const products = await getProducts(client, { userId: user.id });
+  console.log(products);
 
   return { products };
 }
@@ -70,4 +71,3 @@ export default function Manage({ loaderData }: Route.ComponentProps) {
     </div>
   );
 }
-

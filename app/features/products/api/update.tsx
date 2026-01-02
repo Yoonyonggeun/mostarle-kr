@@ -48,7 +48,9 @@ function generateSlug(title: string): string {
 function extractFilePathFromUrl(url: string): string | null {
   try {
     const urlObj = new URL(url);
-    const pathMatch = urlObj.pathname.match(/\/storage\/v1\/object\/public\/products\/(.+)/);
+    const pathMatch = urlObj.pathname.match(
+      /\/storage\/v1\/object\/public\/products\/(.+)/,
+    );
     if (pathMatch) {
       return pathMatch[1];
     }
@@ -113,7 +115,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const productIdNum = parseInt(productId, 10);
   if (isNaN(productIdNum)) {
-    throw data({ error: "유효하지 않은 상품 ID입니다" }, { status: 400, headers });
+    throw data(
+      { error: "유효하지 않은 상품 ID입니다" },
+      { status: 400, headers },
+    );
   }
 
   // Get product
@@ -284,18 +289,12 @@ export async function action({ request }: Route.ActionArgs) {
     .limit(1);
 
   if (!existingProduct) {
-    return data(
-      { error: "상품을 찾을 수 없습니다" },
-      { status: 404, headers },
-    );
+    return data({ error: "상품을 찾을 수 없습니다" }, { status: 404, headers });
   }
 
   // Verify ownership
   if (existingProduct.created_by !== user.id) {
-    return data(
-      { error: "권한이 없습니다" },
-      { status: 403, headers },
-    );
+    return data({ error: "권한이 없습니다" }, { status: 403, headers });
   }
 
   // Generate slug if not provided
@@ -385,42 +384,58 @@ export async function action({ request }: Route.ActionArgs) {
       }
     }
 
-    // Delete old images from database
+    // Delete old images from database using Supabase client (to respect RLS)
     if (imagesToDelete.length > 0) {
-      await db
-        .delete(productImages)
-        .where(
-          eq(
-            productImages.product_id,
-            validData.product_id,
-          ) as any, // Type assertion needed
+      // Delete specific images by their IDs
+      const imageIdsToDelete = imagesToDelete.map((img) => img.image_id);
+      const { error: deleteError } = await client
+        .from("product_images")
+        .delete()
+        .in("image_id", imageIdsToDelete);
+
+      if (deleteError) {
+        return data(
+          { error: `이미지 삭제 실패: ${deleteError.message}` },
+          { status: 400, headers },
         );
-      // Re-insert images we want to keep
+      }
+
+      // If we're keeping some images, we'll re-insert them later with new order
+      // Otherwise, delete all images for this product
       const imagesToKeep = existingImages.filter((img) =>
         validData.existing_image_ids.includes(Number(img.image_id)),
       );
-      if (imagesToKeep.length > 0) {
-        // Delete all and re-insert to maintain order
-        await db
-          .delete(productImages)
-          .where(
-            eq(
-              productImages.product_id,
-              validData.product_id,
-            ) as any,
+      if (imagesToKeep.length === 0) {
+        // Delete all remaining images for this product
+        const { error: deleteAllError } = await client
+          .from("product_images")
+          .delete()
+          .eq("product_id", validData.product_id);
+
+        if (deleteAllError) {
+          return data(
+            { error: `이미지 삭제 실패: ${deleteAllError.message}` },
+            { status: 400, headers },
           );
+        }
       }
     } else {
       // Delete all existing images if we're replacing them
-      if (validData.images.length > 0 || validData.existing_image_ids.length === 0) {
-        await db
-          .delete(productImages)
-          .where(
-            eq(
-              productImages.product_id,
-              validData.product_id,
-            ) as any,
+      if (
+        validData.images.length > 0 ||
+        validData.existing_image_ids.length === 0
+      ) {
+        const { error: deleteAllError } = await client
+          .from("product_images")
+          .delete()
+          .eq("product_id", validData.product_id);
+
+        if (deleteAllError) {
+          return data(
+            { error: `이미지 삭제 실패: ${deleteAllError.message}` },
+            { status: 400, headers },
           );
+        }
       }
     }
 
@@ -465,18 +480,32 @@ export async function action({ request }: Route.ActionArgs) {
         data: { publicUrl },
       } = await client.storage.from("products").getPublicUrl(filePath);
 
-      imageUrls.push({ url: publicUrl, order: existingImagesToKeep.length + i });
+      imageUrls.push({
+        url: publicUrl,
+        order: existingImagesToKeep.length + i,
+      });
     }
 
-    // Insert product images
+    // Insert product images using Supabase client (to respect RLS)
     if (imageUrls.length > 0) {
-      await db.insert(productImages).values(
+      const { error: insertError } = await client.from("product_images").insert(
         imageUrls.map(({ url, order }) => ({
           product_id: validData.product_id,
           image_url: url,
           image_order: order,
         })),
       );
+
+      if (insertError) {
+        // Clean up uploaded files
+        if (uploadedFiles.length > 0) {
+          await client.storage.from("products").remove(uploadedFiles);
+        }
+        return data(
+          { error: `이미지 저장 실패: ${insertError.message}` },
+          { status: 400, headers },
+        );
+      }
     }
 
     // Get existing details
@@ -490,7 +519,8 @@ export async function action({ request }: Route.ActionArgs) {
 
     // Delete details that are not in the keep list
     const detailsToDelete = existingDetails.filter(
-      (detail) => !validData.existing_detail_ids.includes(Number(detail.detail_id)),
+      (detail) =>
+        !validData.existing_detail_ids.includes(Number(detail.detail_id)),
     );
 
     // Delete old detail images from storage
@@ -507,17 +537,24 @@ export async function action({ request }: Route.ActionArgs) {
       }
     }
 
-    // Delete old details from database
+    // Delete old details from database using Supabase client (to respect RLS)
     if (detailsToDelete.length > 0 || validData.details.length > 0) {
       // Delete all existing details
-      await db
-        .delete(productDetails)
-        .where(
-          eq(
-            productDetails.product_id,
-            validData.product_id,
-          ) as any,
+      const { error: deleteDetailsError } = await client
+        .from("product_details")
+        .delete()
+        .eq("product_id", validData.product_id);
+
+      if (deleteDetailsError) {
+        // Clean up uploaded files
+        if (uploadedFiles.length > 0) {
+          await client.storage.from("products").remove(uploadedFiles);
+        }
+        return data(
+          { error: `상세 정보 삭제 실패: ${deleteDetailsError.message}` },
+          { status: 400, headers },
         );
+      }
     }
 
     // Upload detail images and create detail records
@@ -535,8 +572,8 @@ export async function action({ request }: Route.ActionArgs) {
         let detailImageUrl: string | null = null;
 
         // Check if this detail should keep its existing image
-        const existingDetail = existingDetails.find(
-          (d) => validData.existing_detail_ids.includes(Number(d.detail_id)),
+        const existingDetail = existingDetails.find((d) =>
+          validData.existing_detail_ids.includes(Number(d.detail_id)),
         );
 
         if (detail.image) {
@@ -583,8 +620,21 @@ export async function action({ request }: Route.ActionArgs) {
         });
       }
 
-      // Insert product details
-      await db.insert(productDetails).values(detailRecords);
+      // Insert product details using Supabase client (to respect RLS)
+      const { error: detailInsertError } = await client
+        .from("product_details")
+        .insert(detailRecords);
+
+      if (detailInsertError) {
+        // Clean up uploaded files
+        if (uploadedFiles.length > 0) {
+          await client.storage.from("products").remove(uploadedFiles);
+        }
+        return data(
+          { error: `상세 정보 저장 실패: ${detailInsertError.message}` },
+          { status: 400, headers },
+        );
+      }
     }
 
     // Update product record
@@ -632,4 +682,3 @@ export async function action({ request }: Route.ActionArgs) {
     );
   }
 }
-

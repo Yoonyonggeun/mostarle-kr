@@ -45,14 +45,14 @@ export async function getProducts(
 
   // Transform the data to include first image URL
   const productsWithFirstImage = products.map((product) => {
-    const images = (product.product_images as Array<{
-      image_url: string;
-      image_order: number;
-    }> | null) || [];
+    const images =
+      (product.product_images as Array<{
+        image_url: string;
+        image_order: number;
+      }> | null) || [];
 
     // Get the first image (sorted by image_order)
-    const firstImage = images
-      .sort((a, b) => a.image_order - b.image_order)[0];
+    const firstImage = images.sort((a, b) => a.image_order - b.image_order)[0];
 
     return {
       ...product,
@@ -62,4 +62,3 @@ export async function getProducts(
 
   return productsWithFirstImage;
 }
-

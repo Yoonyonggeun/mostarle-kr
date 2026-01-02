@@ -114,7 +114,10 @@ export default function ProductManageTable({
         <TableBody>
           {products.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
+              <TableCell
+                colSpan={6}
+                className="text-muted-foreground text-center"
+              >
                 등록된 상품이 없습니다
               </TableCell>
             </TableRow>
@@ -122,9 +125,7 @@ export default function ProductManageTable({
             products.map((product) => (
               <TableRow
                 key={product.product_id}
-                className={cn(
-                  product.sold_out && "opacity-60",
-                )}
+                className={cn(product.sold_out && "opacity-60")}
               >
                 <TableCell>
                   <div className="relative size-20 overflow-hidden rounded-md border">
@@ -135,7 +136,7 @@ export default function ProductManageTable({
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-muted">
+                      <div className="bg-muted flex h-full w-full items-center justify-center">
                         <span className="text-muted-foreground text-xs">
                           이미지 없음
                         </span>
@@ -161,12 +162,7 @@ export default function ProductManageTable({
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      asChild
-                    >
+                    <Button type="button" variant="outline" size="sm" asChild>
                       <Link to={`/products/edit/${product.product_id}`}>
                         <EditIcon className="size-4" />
                       </Link>
@@ -221,4 +217,3 @@ export default function ProductManageTable({
     </>
   );
 }
-

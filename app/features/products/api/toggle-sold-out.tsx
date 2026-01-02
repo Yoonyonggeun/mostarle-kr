@@ -86,18 +86,12 @@ export async function action({ request }: Route.ActionArgs) {
     .limit(1);
 
   if (!existingProduct) {
-    return data(
-      { error: "상품을 찾을 수 없습니다" },
-      { status: 404, headers },
-    );
+    return data({ error: "상품을 찾을 수 없습니다" }, { status: 404, headers });
   }
 
   // Verify ownership
   if (existingProduct.created_by !== user.id) {
-    return data(
-      { error: "권한이 없습니다" },
-      { status: 403, headers },
-    );
+    return data({ error: "권한이 없습니다" }, { status: 403, headers });
   }
 
   // Toggle sold_out status
@@ -118,4 +112,3 @@ export async function action({ request }: Route.ActionArgs) {
     { headers },
   );
 }
-

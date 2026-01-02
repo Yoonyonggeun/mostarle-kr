@@ -1,4 +1,5 @@
 import type { Route } from "@rr/app/features/products/api/+types/create";
+
 import {
   GripVertical,
   ImageIcon,
@@ -128,9 +129,7 @@ export default function CreateProductForm({
     if (initialData) {
       setTitle(initialData.product.title);
       setPrice(initialData.product.price.toString());
-      setDifficulty(
-        initialData.product.difficulty?.toString() || "",
-      );
+      setDifficulty(initialData.product.difficulty?.toString() || "");
       setWorkingTime(initialData.product.working_time.toString());
       setWidth(initialData.product.width?.toString() || "");
       setHeight(initialData.product.height?.toString() || "");
@@ -162,7 +161,9 @@ export default function CreateProductForm({
           imagePreview: detail.detail_image_url || null,
         }));
       setDetails(existingDetails);
-      setExistingDetailIds(initialData.details.map((detail) => detail.detail_id));
+      setExistingDetailIds(
+        initialData.details.map((detail) => detail.detail_id),
+      );
     }
   }, [initialData]);
 
@@ -286,9 +287,7 @@ export default function CreateProductForm({
       const preview = URL.createObjectURL(file);
       setDetails(
         details.map((d) =>
-          d.id === id
-            ? { ...d, image: file, imagePreview: preview }
-            : d,
+          d.id === id ? { ...d, image: file, imagePreview: preview } : d,
         ),
       );
     }
@@ -375,7 +374,11 @@ export default function CreateProductForm({
     if (mode === "create" && images.length === 0) {
       return;
     }
-    if (mode === "edit" && images.length === 0 && existingImageIds.length === 0) {
+    if (
+      mode === "edit" &&
+      images.length === 0 &&
+      existingImageIds.length === 0
+    ) {
       return;
     }
 
@@ -492,7 +495,8 @@ export default function CreateProductForm({
                 onFocus={handleSlugFocus}
               />
               <p className="text-muted-foreground text-xs">
-                URL에 사용되는 고유 식별자입니다. 비워두면 제목에서 자동 생성됩니다.
+                URL에 사용되는 고유 식별자입니다. 비워두면 제목에서 자동
+                생성됩니다.
               </p>
               {fetcher.data &&
               "fieldErrors" in fetcher.data &&
@@ -571,7 +575,9 @@ export default function CreateProductForm({
         <Card>
           <CardHeader>
             <CardTitle>크기 정보 (선택사항)</CardTitle>
-            <CardDescription>상품의 크기를 입력하세요 (mm 단위)</CardDescription>
+            <CardDescription>
+              상품의 크기를 입력하세요 (mm 단위)
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-3 gap-4">
             <div className="flex flex-col items-start space-y-2">
@@ -662,10 +668,10 @@ export default function CreateProductForm({
                         className="h-full w-full object-cover"
                       />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                        <GripVertical className="text-white size-8" />
+                        <GripVertical className="size-8 text-white" />
                       </div>
                       {img.existingId && (
-                        <div className="absolute left-2 top-2 rounded bg-blue-500 px-2 py-1 text-xs text-white">
+                        <div className="absolute top-2 left-2 rounded bg-blue-500 px-2 py-1 text-xs text-white">
                           기존
                         </div>
                       )}
@@ -674,12 +680,12 @@ export default function CreateProductForm({
                       type="button"
                       variant="destructive"
                       size="icon"
-                      className="absolute right-2 top-2 size-6"
+                      className="absolute top-2 right-2 size-6"
                       onClick={() => handleRemoveImage(img.id)}
                     >
                       <XIcon className="size-4" />
                     </Button>
-                    <div className="mt-2 text-center text-xs text-muted-foreground">
+                    <div className="text-muted-foreground mt-2 text-center text-xs">
                       순서: {index + 1}
                     </div>
                   </div>
@@ -783,7 +789,7 @@ export default function CreateProductForm({
                           className="h-full w-full object-cover"
                         />
                         {detail.id.startsWith("existing-") && (
-                          <div className="absolute left-2 top-2 rounded bg-blue-500 px-2 py-1 text-xs text-white">
+                          <div className="absolute top-2 left-2 rounded bg-blue-500 px-2 py-1 text-xs text-white">
                             기존 이미지
                           </div>
                         )}
@@ -837,9 +843,7 @@ export default function CreateProductForm({
             "fieldErrors" in fetcher.data &&
             Object.keys(fetcher.data.fieldErrors || {}).length > 0 ? (
               <FormErrors
-                errors={[
-                  "입력한 정보를 확인하고 다시 시도해주세요",
-                ]}
+                errors={["입력한 정보를 확인하고 다시 시도해주세요"]}
               />
             ) : null}
           </CardFooter>
@@ -848,4 +852,3 @@ export default function CreateProductForm({
     </fetcher.Form>
   );
 }
-
